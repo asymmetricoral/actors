@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::collections::VecDeque;
 use uuid::Uuid;
 
+#[derive(Debug)]
 enum Message {
     Add(i32),
     Subtract(i32),
@@ -56,11 +57,11 @@ impl Actor {
 
 struct World {
     // world owns Actor
-    world: HashMap<Uuid, Actor>,
+    actors: HashMap<Uuid, Actor>,
 }
 
 impl World {
-    fn new(capacity: u32) -> Self {
+    fn new(capacity: usize) -> Self {
         let populated_world: HashMap<Uuid, Actor> = (0..capacity)
             .map(|_| {
                 let new_uuid = Uuid::new_v4();
@@ -70,35 +71,33 @@ impl World {
             })
             .collect();
         World {
-            world: populated_world,
+            actors: populated_world,
         }
     }
 
     fn current_state(&self) -> &HashMap<Uuid, Actor> {
-        &self.world
+        &self.actors
     }
 
     fn send(&mut self, target_uuid: Uuid, message: Message) {
-        // sending a message to a non-existent actor should... panic
         // https://doc.rust-lang.org/std/collections/struct.HashMap.html#method.get_mut
-        let actor = self.world.get_mut(&target_uuid).unwrap(); // mutable [reference]
-        actor.send(message);
+        if let Some(actor) = self.actors.get_mut(&target_uuid) {
+            actor.send(message);
+        } else {
+            println!("Dead letter: Actor {} not found.", target_uuid);
+        }
     }
 
     fn tick(&mut self) {
-        self.world
-            .values_mut()
-            .filter(|actor| !actor.messages.is_empty())
-            .for_each(|actor| {
-                for _ in 0..3 {
-                    if actor.has_next() {
-                        actor.process();
-                    } else {
-                        break;
-                    }
+        for actor in self.actors.values_mut() {
+            for _ in 0..3 {
+                if actor.has_next() {
+                    actor.process();
+                } else {
+                    break;
                 }
             }
-        );
+        }
     }
 }
 
