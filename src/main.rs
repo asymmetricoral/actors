@@ -1,9 +1,23 @@
+use rand::distr::{Distribution, StandardUniform};
+use rand::prelude::*;
+use std::collections::HashMap;
 use std::collections::VecDeque;
+use uuid::Uuid;
 
 enum Message {
     Add(i32),
     Subtract(i32),
     Print,
+}
+
+impl Distribution<Message> for StandardUniform {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Message {
+        match rng.random_range(0..5) {
+            0 => Message::Add(rng.random_range(1..100)),
+            1 => Message::Subtract(rng.random_range(1..100)),
+            _ => Message::Print,
+        }
+    }
 }
 
 struct Actor {
@@ -22,8 +36,8 @@ impl Actor {
     fn process(&mut self) {
         if let Some(msg) = self.messages.pop_front() {
             match msg {
-                Message::Add(i) => self.state += i,
-                Message::Subtract(i) => self.state -= i,
+                Message::Add(i) => self.state = self.state.saturating_add(i),
+                Message::Subtract(i) => self.state = self.state.saturating_sub(i),
                 Message::Print => println!("{}", self.state),
             }
         } else {
@@ -34,18 +48,77 @@ impl Actor {
     fn send(&mut self, msg: Message) {
         self.messages.push_back(msg);
     }
+
+    fn has_next(&self) -> bool {
+        !self.messages.is_empty()
+    }
+}
+
+struct World {
+    // world owns Actor
+    world: HashMap<Uuid, Actor>,
+}
+
+impl World {
+    fn new(capacity: u32) -> Self {
+        let populated_world: HashMap<Uuid, Actor> = (0..capacity)
+            .map(|_| {
+                let new_uuid = Uuid::new_v4();
+                let new_actor = Actor::new(0);
+
+                (new_uuid, new_actor)
+            })
+            .collect();
+        World {
+            world: populated_world,
+        }
+    }
+
+    fn current_state(&self) -> &HashMap<Uuid, Actor> {
+        &self.world
+    }
+
+    fn send(&mut self, target_uuid: Uuid, message: Message) {
+        // sending a message to a non-existent actor should... panic
+        // https://doc.rust-lang.org/std/collections/struct.HashMap.html#method.get_mut
+        let actor = self.world.get_mut(&target_uuid).unwrap(); // mutable [reference]
+        actor.send(message);
+    }
+
+    fn tick(&mut self) {
+        self.world
+            .values_mut()
+            .filter(|actor| !actor.messages.is_empty())
+            .for_each(|actor| {
+                for _ in 0..3 {
+                    if actor.has_next() {
+                        actor.process();
+                    } else {
+                        break;
+                    }
+                }
+            }
+        );
+    }
 }
 
 fn main() {
-    let mut my_actor = Actor::new(0);
+    let mut my_world = World::new(10);
 
-    println!("Starting actor test...");
+    println!("Grabbing UUIDs...");
+    let keyset: Vec<Uuid> = my_world.current_state().keys().copied().collect();
+    for key in &keyset {
+        println!("{key}");
+    }
 
-    my_actor.send(Message::Add(3));
-    my_actor.send(Message::Print);
-    my_actor.process();
-    my_actor.send(Message::Subtract(1));
-    my_actor.process();
-    my_actor.process();
-    my_actor.process();
+    println!("Sending random messages to actors...");
+    let mut rng = rand::rng();
+    for _ in 0..1000 {
+        let random_target = keyset.choose(&mut rng).unwrap();
+        my_world.send(*random_target, rand::random());
+    }
+
+    for _ in 0..1000 {
+        my_world.tick();
+    }
 }
