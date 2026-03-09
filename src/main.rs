@@ -8,6 +8,8 @@ use uuid::Uuid;
 enum Message {
     Add(i32),
     Subtract(i32),
+    Spawn(i32),
+    ChildSpawned(Uuid),
     Print,
 }
 
@@ -16,14 +18,20 @@ impl Distribution<Message> for StandardUniform {
         match rng.random_range(0..5) {
             0 => Message::Add(rng.random_range(1..100)),
             1 => Message::Subtract(rng.random_range(1..100)),
-            _ => Message::Print,
+            2 => Message::Print,
+            _ => Message::Spawn(rng.random_range(1..100)),
         }
     }
+}
+
+enum Command {
+    SpawnNewActor(i32),
 }
 
 struct Actor {
     state: i32,
     messages: VecDeque<Message>,
+    children: Vec<Uuid>,
 }
 
 impl Actor {
@@ -31,19 +39,23 @@ impl Actor {
         Self {
             state: initial_state,
             messages: VecDeque::new(),
+            children: Vec::new(),
         }
     }
 
-    fn process(&mut self) {
+    fn process(&mut self) -> Option<Command> {
         if let Some(msg) = self.messages.pop_front() {
             match msg {
                 Message::Add(i) => self.state = self.state.saturating_add(i),
                 Message::Subtract(i) => self.state = self.state.saturating_sub(i),
                 Message::Print => println!("{}", self.state),
+                Message::Spawn(i) => return Some(Command::SpawnNewActor(i)),
+                Message::ChildSpawned(uuid) => self.children.push(uuid),
             }
         } else {
             println!("No more messages to process");
         }
+        None
     }
 
     fn send(&mut self, msg: Message) {
@@ -88,16 +100,28 @@ impl World {
         }
     }
 
+    fn spawn_actor(&mut self, parent_uuid: Uuid, initial_state: i32) {
+        let uuid: Uuid = Uuid::new_v4();
+        self.actors.insert(uuid, Actor::new(initial_state));
+        self.send(parent_uuid, Message::ChildSpawned(uuid));
+    }
+
     fn tick(&mut self) {
-        for actor in self.actors.values_mut() {
+        let mut new_actors = Vec::new();
+        for (tag, actor) in self.actors.iter_mut() {
             for _ in 0..3 {
                 if actor.has_next() {
-                    actor.process();
+                    if let Some(Command::SpawnNewActor(i)) = actor.process() {
+                        new_actors.push((*tag, i));
+                    }
                 } else {
                     break;
                 }
             }
         }
+        new_actors
+            .into_iter()
+            .for_each(|(tag, i)| self.spawn_actor(tag, i));
     }
 }
 
