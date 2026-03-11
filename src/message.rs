@@ -1,14 +1,15 @@
 use rand::distr::{Distribution, StandardUniform};
 use rand::prelude::*;
 use uuid::Uuid;
+use serde::{Serialize, Deserialize};
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum Message {
     Add(i32),
     Subtract(i32),
     Spawn(i32),
     ChildSpawned(Uuid),
-    Print,
+    Print
 }
 
 impl Distribution<Message> for StandardUniform {
@@ -17,11 +18,11 @@ impl Distribution<Message> for StandardUniform {
             0 => Message::Add(rng.random_range(1..100)),
             1 => Message::Subtract(rng.random_range(1..100)),
             2 => Message::Print,
-            _ => Message::Spawn(rng.random_range(1..100)),
+            _ => Message::Spawn(rng.random_range(1..100))
         }
     }
 }
 
 pub enum Command {
-    SpawnNewActor(i32),
+    SpawnNewActor(i32)
 }

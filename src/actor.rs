@@ -1,7 +1,10 @@
 use std::collections::VecDeque;
+use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 
-use crate::message::{Command, Message}; // Import what you need!
+use crate::message::{Command, Message};
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Actor {
     state: i32,
     messages: VecDeque<Message>,
@@ -22,7 +25,7 @@ impl Actor {
             match msg {
                 Message::Add(i) => self.state = self.state.saturating_add(i),
                 Message::Subtract(i) => self.state = self.state.saturating_sub(i),
-                Message::Print => println!("{}", self.state),
+                Message::Print => print!("{} ", self.state),
                 Message::Spawn(i) => return Some(Command::SpawnNewActor(i)),
                 Message::ChildSpawned(uuid) => self.children.push(uuid),
             }

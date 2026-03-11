@@ -3,7 +3,9 @@ use uuid::Uuid;
 
 use crate::actor::Actor;
 use crate::message::{Command, Message};
+use serde::{Serialize, Deserialize};
 
+#[derive(Serialize, Deserialize, Debug)]
 pub struct World {
     // world owns Actor
     actors: HashMap<Uuid, Actor>,
@@ -22,6 +24,12 @@ impl World {
         World {
             actors: populated_world,
         }
+    }
+
+    // until we implement garbage collection
+    // remove all nodes with empty messages
+    pub fn reset_dead_actors(&mut self) {
+        self.actors.retain(|_, actor| actor.has_next());
     }
 
     pub fn current_state(&self) -> &HashMap<Uuid, Actor> {
