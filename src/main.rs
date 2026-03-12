@@ -1,3 +1,5 @@
+use std::error::Error;
+
 use rand::prelude::*;
 use uuid::Uuid;
 
@@ -8,9 +10,9 @@ mod file_service;
 mod message;
 mod world;
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     // FileService::to_file(&my_world, "first_snapshot");
-    let mut my_world = FileService::from_file("resources/first_snapshot.pulsar");
+    let mut my_world = FileService::from_file("resources/first_snapshot.pulsar")?;
     if my_world.current_state().is_empty() {
         println!("Mass extinction.");
         my_world = World::new(10);
@@ -47,5 +49,6 @@ fn main() {
 
     my_world.reset_dead_actors();
     println!("Survivors: {}", my_world.current_state().len());
-    FileService::to_file(&my_world, "first_snapshot");
+    FileService::to_file(&my_world, "first_snapshot")?;
+    Ok(())
 }
